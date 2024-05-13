@@ -3,8 +3,9 @@ package com.cris.crudtestex.controllers;
 import com.cris.crudtestex.entities.Student;
 import com.cris.crudtestex.repositories.StudentRepository;
 import com.cris.crudtestex.service.StudentService;
-import lombok.NonNull;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,50 +16,60 @@ import java.util.Optional;
 @RequestMapping("/student")
 public class StudentController {
 
-    @Autowired
-    private StudentRepository studentRepository;
+    private final StudentRepository studentRepository;
+    private final StudentService studentService;
 
     @Autowired
-    private StudentService studentService;
+    public StudentController(StudentRepository studentRepository, StudentService studentService) {
+        this.studentRepository = studentRepository;
+        this.studentService = studentService;
+    }
 
     @PostMapping("")
-    public @ResponseBody Student create(@RequestBody Student student) {
-        return studentRepository.save(student);
-
+    public ResponseEntity<Student> create(@RequestBody Student student) {
+        Student savedStudent = studentRepository.save(student);
+        return ResponseEntity.status(HttpStatus.CREATED).body(savedStudent);
     }
 
     @GetMapping("/")
-    public @ResponseBody List<Student> getList() {
-        return studentRepository.findAll();
+    public ResponseEntity<List<Student>> getList() {
+        List<Student> students = studentRepository.findAll();
+        return ResponseEntity.ok().body(students);
     }
 
     @GetMapping("/{id}")
-    public @ResponseBody Student getSingle(@PathVariable Long id) {
+    public ResponseEntity<Student> getSingle(@PathVariable Long id) {
         Optional<Student> student = studentRepository.findById(id);
-        if (student.isPresent()) {
-            return student.get();
-        } else {
-            return null;
-        }
+        return student.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PutMapping("/{id}")
-    public @ResponseBody Student update(@PathVariable Long id, @RequestBody @NonNull Student student) {
-        student.setId(id);
-        student.setName(student.getName());
-        student.setSurname(student.getSurname());
-        return studentRepository.save(student);
+    public ResponseEntity<Student> update(@PathVariable Long id, @RequestBody Student student) {
+        Optional<Student> existingStudentOptional = studentRepository.findById(id);
+        if (existingStudentOptional.isPresent()) {
+            Student existingStudent = existingStudentOptional.get();
+            existingStudent.setName(student.getName());
+            existingStudent.setSurname(student.getSurname());
+            Student updatedStudent = studentRepository.save(existingStudent);
+            return ResponseEntity.ok(updatedStudent);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @PutMapping("/{id}/working")
-    public @ResponseBody Student setStudentWorking(@PathVariable Long id, @RequestParam("working") boolean working) {
-        return studentService.setStudentWorkingStatus(id, working);
+    public ResponseEntity<Student> setStudentWorking(@PathVariable Long id, @RequestParam("working") boolean working) {
+        Student updatedStudent = studentService.setStudentWorkingStatus(id, working);
+        if (updatedStudent != null) {
+            return ResponseEntity.ok(updatedStudent);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
         studentRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
-
-
 }
